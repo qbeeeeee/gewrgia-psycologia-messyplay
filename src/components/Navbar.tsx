@@ -1,13 +1,171 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
 import { Link, useLocation } from "react-router-dom";
 import logo from "../assets/logo.jpg";
 import menu from "../assets/menu.svg";
 import cross from "../assets/cross.svg";
+import Phone from "../assets/ContactFAB/phone.svg?react";
+
+gsap.registerPlugin(useGSAP);
 
 type NavLink = {
   label: string;
   href: string;
 };
+
+type BookSessionButtonProps = {
+  className: string;
+  onClick?: () => void;
+  currentPath: string;
+};
+
+function BookSessionButton({
+  className,
+  onClick,
+  currentPath,
+}: BookSessionButtonProps) {
+  const buttonRef = useRef<HTMLAnchorElement | null>(null);
+  const circleRef = useRef<HTMLSpanElement | null>(null);
+  const topTextRef = useRef<HTMLSpanElement | null>(null);
+  const bottomTextRef = useRef<HTMLSpanElement | null>(null);
+  const hoverTimelineRef = useRef<gsap.core.Timeline | null>(null);
+  const isHoveredRef = useRef(false);
+  const textGap = 30;
+
+  useGSAP(
+    () => {
+      const button = buttonRef.current;
+      const circle = circleRef.current;
+      const topText = topTextRef.current;
+      const bottomText = bottomTextRef.current;
+
+      if (!button || !circle || !topText || !bottomText) {
+        return;
+      }
+
+      const getCircleOffsets = () => {
+        const circleSize = button.offsetHeight;
+
+        return {
+          startX: 0,
+          endX: -circleSize,
+        };
+      };
+
+      const hoverTimeline = gsap.timeline({
+        paused: true,
+        defaults: {
+          duration: 0.2,
+          ease: "power1.out",
+          overwrite: true,
+        },
+      });
+      hoverTimelineRef.current = hoverTimeline;
+
+      gsap.set(circle, {
+        x: getCircleOffsets().startX,
+        rotation: 180,
+      });
+      gsap.set(topText, { y: 0 });
+      gsap.set(bottomText, { y: textGap });
+
+      hoverTimeline.to(
+        circle,
+        {
+          x: () => getCircleOffsets().endX,
+          duration: 0.34,
+          ease: "power2.out",
+          rotation: 0,
+        },
+        0,
+      );
+      hoverTimeline.to(topText, { y: "-100%" }, 0);
+      hoverTimeline.to(bottomText, { y: 0 }, 0.08);
+
+      const handleEnter = () => {
+        isHoveredRef.current = true;
+        hoverTimeline.invalidate().play();
+      };
+      const handleLeave = () => {
+        isHoveredRef.current = false;
+        hoverTimeline.reverse();
+      };
+
+      button.addEventListener("pointerenter", handleEnter);
+      button.addEventListener("pointerleave", handleLeave);
+
+      return () => {
+        hoverTimelineRef.current = null;
+        button.removeEventListener("pointerenter", handleEnter);
+        button.removeEventListener("pointerleave", handleLeave);
+      };
+    },
+    { scope: buttonRef },
+  );
+
+  useEffect(() => {
+    const button = buttonRef.current;
+    const circle = circleRef.current;
+    const topText = topTextRef.current;
+    const bottomText = bottomTextRef.current;
+
+    if (!button || !circle || !topText || !bottomText) {
+      return;
+    }
+
+    if (isHoveredRef.current) {
+      hoverTimelineRef.current?.progress(1, false);
+      return;
+    }
+
+    gsap.set(circle, {
+      x: 0,
+      rotation: 180,
+    });
+    gsap.set(topText, { y: 0 });
+    gsap.set(bottomText, { y: textGap });
+    hoverTimelineRef.current?.pause(0);
+  }, [currentPath]);
+
+  return (
+    <Link
+      ref={buttonRef}
+      to="/contact"
+      onClick={onClick}
+      className={`group relative isolate inline-flex text-lg items-center justify-center overflow-visible text-white font-semibold px-5 py-2 rounded-full ${className}`}
+    >
+      <span
+        ref={circleRef}
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 left-0 z-0 inline-flex aspect-square h-full items-center justify-center rounded-full bg-[#01a39c] text-base"
+      >
+        <Phone className="w-auto h-1/2 text-white" />
+      </span>
+
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-[1] rounded-full bg-[#01a39c] transition-colors duration-200 group-hover:bg-[#019a94]"
+      />
+
+      <span className="relative z-10 inline-flex h-[30px] items-center justify-center overflow-hidden leading-none">
+        <span
+          ref={topTextRef}
+          className="relative flex h-full items-center justify-center will-change-transform"
+        >
+          Book a Session
+        </span>
+        <span
+          ref={bottomTextRef}
+          aria-hidden="true"
+          className="absolute inset-0 flex items-center justify-center will-change-transform"
+        >
+          Book a Session
+        </span>
+      </span>
+    </Link>
+  );
+}
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -66,12 +224,10 @@ export default function Navbar() {
           </ul>
 
           {/* CTA Button */}
-          <Link
-            to="/contact"
-            className="hidden md:inline-block bg-[#01a39c] hover:bg-[#019a94] text-white font-semibold px-5 py-2 rounded-full transition-colors duration-200"
-          >
-            Book a Session
-          </Link>
+          <BookSessionButton
+            className="hidden md:inline-flex"
+            currentPath={location.pathname}
+          />
 
           {/* Mobile Hamburger */}
           <button
@@ -127,13 +283,11 @@ export default function Navbar() {
             ))}
           </ul>
 
-          <Link
-            to="/contact"
+          <BookSessionButton
+            className="mt-2 max-w-max"
             onClick={() => setMenuOpen(false)}
-            className="inline-block max-w-max mt-2 bg-[#01a39c] hover:bg-[#01928c] text-white font-semibold px-5 py-2 rounded-full transition-colors duration-200"
-          >
-            Book a Session
-          </Link>
+            currentPath={location.pathname}
+          />
         </div>
       </div>
     </>
